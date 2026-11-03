@@ -523,6 +523,34 @@ document.querySelectorAll("[data-next]").forEach(b => b.addEventListener("click"
 document.querySelectorAll("[data-back]").forEach(b => b.addEventListener("click", () => goStep(step - 1)));
 
 /* ===== Envío al correo (FormSubmit) ===== */
+function showSuccess(){
+  document.getElementById("leadForm").style.display = "none";
+  document.querySelector(".progress").style.display = "none";
+  document.getElementById("success").classList.add("show");
+}
+/* Regreso desde el envío clásico: ?enviado=1 */
+if (new URLSearchParams(location.search).get("enviado") === "1"){
+  showSuccess();
+  history.replaceState(null, "", location.pathname + "#contacto");
+  setTimeout(() => document.getElementById("contacto").scrollIntoView(), 300);
+}
+
+/* Envío clásico (respaldo): funciona aunque el navegador o una extensión bloqueen la petición en segundo plano */
+function classicSubmit(payload){
+  const f = document.createElement("form");
+  f.method = "POST";
+  f.action = "https://formsubmit.co/" + DESTINO;
+  f.style.display = "none";
+  const fields = {...payload, _captcha: "false",
+    _next: location.origin + location.pathname + "?enviado=1#contacto"};
+  Object.entries(fields).forEach(([k, v]) => {
+    const i = document.createElement("input");
+    i.type = "hidden"; i.name = k; i.value = v; f.appendChild(i);
+  });
+  document.body.appendChild(f);
+  f.submit();
+}
+
 document.getElementById("leadForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   if (!validate(2)) return;
@@ -531,7 +559,7 @@ document.getElementById("leadForm").addEventListener("submit", async (e) => {
   const data = Object.fromEntries(new FormData(form).entries());
   delete data._honey;
   const payload = {
-    _subject: "Nueva solicitud de taller de IA: " + (data.taller || "") + " · " + (data.empresa || ""),
+    _subject: "Nueva solicitud de taller de IA: " + (data.taller || "") + " - " + (data.empresa || ""),
     _template: "table",
     _replyto: data.email,
     ...data
@@ -540,14 +568,12 @@ document.getElementById("leadForm").addEventListener("submit", async (e) => {
   try{
     const res = await fetch(ENDPOINT, {method:"POST", headers:{"Content-Type":"application/json","Accept":"application/json"}, body: JSON.stringify(payload)});
     const out = await res.json().catch(() => ({}));
-    if (!res.ok || String(out.success) !== "true") throw new Error(out.message || "Error de envío");
-    form.style.display = "none";
-    document.querySelector(".progress").style.display = "none";
-    document.getElementById("success").classList.add("show");
+    if (res.ok && String(out.success) === "true"){ showSuccess(); return; }
+    console.warn("FormSubmit respondió:", res.status, out);
+    classicSubmit(payload);   // activación pendiente u otro rechazo: se reintenta por la vía clásica
   }catch(err){
-    const body = encodeURIComponent(Object.entries(data).map(([k,v]) => k + ": " + v).join("\n"));
-    errEl.innerHTML = 'No se pudo enviar la solicitud. Revisa tu conexión e inténtalo de nuevo, o <a href="mailto:' + DESTINO + '?subject=Solicitud%20de%20taller%20de%20IA&body=' + body + '">envíala por correo</a>.';
-    btn.disabled = false; btn.textContent = "Enviar solicitud";
+    console.warn("Envío en segundo plano bloqueado:", err);
+    classicSubmit(payload);   // red, CORS o extensión bloqueando: se reintenta por la vía clásica
   }
 });
 </script>
