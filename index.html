@@ -433,9 +433,12 @@ footer a{color:#fff;text-decoration:none;font-weight:600}
 </a>
 
 <script>
-/* ===== CONFIGURACIÓN: correo donde llegan las solicitudes ===== */
+/* ===== CONFIGURACIÓN ===================================================
+   1. Crea tu clave gratuita en https://web3forms.com con ofmcontreras@gmail.com
+   2. Pega la clave entre las comillas de WEB3FORMS_KEY
+   ======================================================================= */
+const WEB3FORMS_KEY = "c9f6b4ae-b3cd-48d3-b654-99220f107dfc";
 const DESTINO = "ofmcontreras@gmail.com";
-const ENDPOINT = "https://formsubmit.co/ajax/" + DESTINO;
 
 document.getElementById("yr").textContent = new Date().getFullYear();
 const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -522,58 +525,44 @@ function validate(i){
 document.querySelectorAll("[data-next]").forEach(b => b.addEventListener("click", () => { if (validate(step)) goStep(step + 1); }));
 document.querySelectorAll("[data-back]").forEach(b => b.addEventListener("click", () => goStep(step - 1)));
 
-/* ===== Envío al correo (FormSubmit) ===== */
+/* ===== Envío al correo (Web3Forms) ===== */
 function showSuccess(){
   document.getElementById("leadForm").style.display = "none";
   document.querySelector(".progress").style.display = "none";
   document.getElementById("success").classList.add("show");
 }
-/* Regreso desde el envío clásico: ?enviado=1 */
-if (new URLSearchParams(location.search).get("enviado") === "1"){
-  showSuccess();
-  history.replaceState(null, "", location.pathname + "#contacto");
-  setTimeout(() => document.getElementById("contacto").scrollIntoView(), 300);
-}
-
-/* Envío clásico (respaldo): funciona aunque el navegador o una extensión bloqueen la petición en segundo plano */
-function classicSubmit(payload){
-  const f = document.createElement("form");
-  f.method = "POST";
-  f.action = "https://formsubmit.co/" + DESTINO;
-  f.style.display = "none";
-  const fields = {...payload, _captcha: "false",
-    _next: location.origin + location.pathname + "?enviado=1#contacto"};
-  Object.entries(fields).forEach(([k, v]) => {
-    const i = document.createElement("input");
-    i.type = "hidden"; i.name = k; i.value = v; f.appendChild(i);
-  });
-  document.body.appendChild(f);
-  f.submit();
+function showMailFallback(data){
+  const errEl = document.getElementById("err-send"), btn = document.getElementById("sendBtn");
+  const body = encodeURIComponent(Object.entries(data).map(([k,v]) => k + ": " + v).join("\n"));
+  errEl.innerHTML = 'No se pudo enviar la solicitud. Inténtalo de nuevo en unos minutos o <a href="mailto:' + DESTINO + '?subject=Solicitud%20de%20taller%20de%20IA&body=' + body + '">envíala por correo</a>.';
+  btn.disabled = false; btn.textContent = "Enviar solicitud";
 }
 
 document.getElementById("leadForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   if (!validate(2)) return;
-  const form = e.target, btn = document.getElementById("sendBtn"), errEl = document.getElementById("err-send");
+  const form = e.target, btn = document.getElementById("sendBtn");
   if (form._honey.value) return; // bot
   const data = Object.fromEntries(new FormData(form).entries());
   delete data._honey;
   const payload = {
-    _subject: "Nueva solicitud de taller de IA: " + (data.taller || "") + " - " + (data.empresa || ""),
-    _template: "table",
-    _replyto: data.email,
+    access_key: WEB3FORMS_KEY,
+    subject: "Nueva solicitud de taller de IA: " + (data.taller || "") + " - " + (data.empresa || ""),
+    from_name: "Landing Talleres de IA",
+    replyto: data.email,
     ...data
   };
-  btn.disabled = true; btn.textContent = "Enviando…"; errEl.textContent = "";
+  btn.disabled = true; btn.textContent = "Enviando…"; document.getElementById("err-send").textContent = "";
   try{
-    const res = await fetch(ENDPOINT, {method:"POST", headers:{"Content-Type":"application/json","Accept":"application/json"}, body: JSON.stringify(payload)});
+    const res = await fetch("https://api.web3forms.com/submit", {
+      method:"POST", headers:{"Content-Type":"application/json","Accept":"application/json"}, body: JSON.stringify(payload)});
     const out = await res.json().catch(() => ({}));
-    if (res.ok && String(out.success) === "true"){ showSuccess(); return; }
-    console.warn("FormSubmit respondió:", res.status, out);
-    classicSubmit(payload);   // activación pendiente u otro rechazo: se reintenta por la vía clásica
+    if (res.ok && out.success){ showSuccess(); return; }
+    console.warn("Web3Forms respondió:", res.status, out);
+    showMailFallback(data);
   }catch(err){
-    console.warn("Envío en segundo plano bloqueado:", err);
-    classicSubmit(payload);   // red, CORS o extensión bloqueando: se reintenta por la vía clásica
+    console.warn("Error de envío:", err);
+    showMailFallback(data);
   }
 });
 </script>
