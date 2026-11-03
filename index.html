@@ -439,6 +439,9 @@ footer a{color:#fff;text-decoration:none;font-weight:600}
    ======================================================================= */
 const WEB3FORMS_KEY = "c9f6b4ae-b3cd-48d3-b654-99220f107dfc";
 const DESTINO = "ofmcontreras@gmail.com";
+/* Embudo de ventas (Google Apps Script): pega aquí la URL de la aplicación web */
+const SHEETS_WEBHOOK = "https://script.google.com/macros/s/AKfycbyWjOPB2udkt2FJQXEnqwEyHO2W9jZxJPjB_yEDI9hrJ-ZE7PZUK2_kAI7cFEJG4aCkCg/exec";
+const SHEETS_TOKEN = "omc-693d14d27855";
 
 document.getElementById("yr").textContent = new Date().getFullYear();
 const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -553,6 +556,11 @@ document.getElementById("leadForm").addEventListener("submit", async (e) => {
     ...data
   };
   btn.disabled = true; btn.textContent = "Enviando…"; document.getElementById("err-send").textContent = "";
+  if (SHEETS_WEBHOOK.startsWith("https://script.google.com")){
+    fetch(SHEETS_WEBHOOK, {method:"POST", mode:"no-cors", keepalive:true,
+      headers:{"Content-Type":"text/plain;charset=utf-8"},
+      body: JSON.stringify({...data, token: SHEETS_TOKEN})}).catch(() => {});
+  }
   try{
     const res = await fetch("https://api.web3forms.com/submit", {
       method:"POST", headers:{"Content-Type":"application/json","Accept":"application/json"}, body: JSON.stringify(payload)});
