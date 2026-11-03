@@ -520,6 +520,7 @@ function validate(i){
       const el = document.getElementById(id); let msg = "";
       if (!el.value.trim()) msg = "Este campo es obligatorio.";
       else if (id === "email" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(el.value.trim())) msg = "Escribe un correo válido, por ejemplo nombre@empresa.com.";
+      else if ((id === "nombre" || id === "empresa" || id === "pais") && !/[a-záéíóúñü]{2,}/i.test(el.value)) msg = "Escribe el nombre en letras, no solo números.";
       setErr(el, msg); if (msg) ok = false;
     });
   }
